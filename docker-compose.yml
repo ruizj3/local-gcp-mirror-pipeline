@@ -28,7 +28,17 @@ services:
       POSTGRES_PASSWORD: pipeline_password
       POSTGRES_DB: analytics_warehouse
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2b. Web UI for querying the warehouse (Mirrors BigQuery Console query editor)
+  adminer:
+    image: adminer:4.8.1
+    depends_on:
+      - postgres
+    ports:
+      - "8081:8080"
 
   # 3. Pipeline Workflow Orchestrator (Mirrors GCP Cloud Composer)
   airflow:
@@ -40,5 +50,11 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
     ports:
-      - "8080:8080"
-    command: db init && airflow users create --username admin --password admin --firstname First --lastname Last --role Admin --email admin@example.com && airflow webserver
+      - "8085:8080"
+    command: >
+      bash -c "airflow db init && 
+      airflow users create --username admin --password admin --firstname First --lastname Last --role Admin --email admin@example.com && 
+      exec airflow webserver"
+
+volumes:
+  postgres_data:

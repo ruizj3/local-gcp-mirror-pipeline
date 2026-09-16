@@ -1,0 +1,11 @@
+# kafka/mock_producer.py dependencies
+kafka-python==2.0.2
+
+# spark/jobs/streaming_ingest.py dependencies
+pyspark==3.4.1
+
+# Compilation-free type stubs for local IDE autocompletion
+airflow-stubs
+
+# postgres storage verification or direct scripts
+psycopg2-binary==2.9.9
