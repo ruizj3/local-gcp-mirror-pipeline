@@ -1,0 +1,13 @@
+# Local container storage and logs
+.env
+airflow/logs/
+airflow/plugins/
+kafka/data/
+postgres/data/
+
+# OS and IDE files
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.pyc
