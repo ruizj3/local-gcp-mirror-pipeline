@@ -1,0 +1,8 @@
+FROM confluentinc/cp-kafka:7.3.0
+
+COPY broker-entrypoint.sh /usr/local/bin/broker-entrypoint.sh
+USER root
+RUN chmod +x /usr/local/bin/broker-entrypoint.sh
+USER appuser
+
+ENTRYPOINT ["/usr/local/bin/broker-entrypoint.sh"]
