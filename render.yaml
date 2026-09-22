@@ -24,13 +24,13 @@ services:
     plan: starter
     envVars:
       - key: ZOOKEEPER_CLIENT_PORT
-        value: 2181
+        value: "10000"
 
   - type: pserv
     name: kafka
-    runtime: image
-    image:
-      url: confluentinc/cp-kafka:7.3.0
+    runtime: docker
+    dockerfilePath: ./kafka/Dockerfile.broker
+    dockerContext: .
     plan: starter
     envVars:
       - key: KAFKA_BROKER_ID
@@ -40,18 +40,15 @@ services:
           name: zookeeper
           type: pserv
           property: hostport
-      - key: KAFKA_ADVERTISED_LISTENERS
+      - key: KAFKA_ADVERTISED_HOST
         fromService:
           name: kafka
           type: pserv
-          property: hostport
-        # NOTE: this resolves to "kafka:9092" but needs the "PLAINTEXT://" scheme
-        # prefixed. If Render doesn't let you prefix a fromService value, set this env
-        # var manually in the Dashboard after first sync: PLAINTEXT://kafka:9092
-      - key: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
-        value: PLAINTEXT:PLAINTEXT
+          property: host
+      - key: KAFKA_PORT
+        value: "10000"
       - key: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
-        value: 1
+        value: "1"
 
   # Mirrors GCP Cloud Composer. Web (not private) service so you can reach the UI.
   # Disk persists the sqlite metadata db + admin user across resumes.
