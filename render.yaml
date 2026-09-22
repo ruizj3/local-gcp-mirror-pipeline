@@ -40,7 +40,7 @@ services:
           name: zookeeper
           type: pserv
           property: hostport
-      - key: KAFKA_ADVERTISED_HOST
+      - key: RENDER_KAFKA_HOST
         fromService:
           name: kafka
           type: pserv
