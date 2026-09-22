@@ -9,3 +9,8 @@ airflow-stubs
 
 # postgres storage verification or direct scripts
 psycopg2-binary==2.9.9
+
+# scripts/export_training_data.py dependencies
+pandas==2.0.3
+sqlalchemy==2.0.32
+pyarrow==17.0.0
