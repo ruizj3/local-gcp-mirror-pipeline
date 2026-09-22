@@ -61,20 +61,21 @@ services:
     dockerfilePath: ./airflow/Dockerfile
     dockerContext: ./airflow
     plan: starter
-    dockerCommand: >
-      bash -c "airflow db init &&
-      airflow users create --username admin --password admin --firstname First --lastname Last --role Admin --email admin@example.com &&
-      exec airflow webserver"
+    dockerCommand: /usr/local/bin/start-airflow.sh
     envVars:
       - key: AIRFLOW__CORE__EXECUTOR
         value: SequentialExecutor
       - key: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-        value: sqlite:////opt/airflow/airflow.db
+        value: sqlite:////opt/airflow/data/airflow.db
       - key: AIRFLOW__CORE__LOAD_EXAMPLES
         value: "False"
+      - key: AIRFLOW__WEBSERVER__WEB_SERVER_HOST
+        value: 0.0.0.0
+      - key: AIRFLOW__WEBSERVER__WEB_SERVER_PORT
+        value: "10000"
     disk:
       name: airflow-data
-      mountPath: /opt/airflow
+      mountPath: /opt/airflow/data
       sizeGB: 1
     # After first deploy, add the postgres_warehouse connection manually in the Airflow
     # UI (Admin > Connections) pointing at the analytics-warehouse database below.
