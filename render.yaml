@@ -1,0 +1,127 @@
+# Render Blueprint for local-gcp-mirror-pipeline.
+#
+# Deploy this BEFORE fraud_detection_transformer/render.yaml — that Blueprint references
+# the `analytics-warehouse` database defined here by name.
+#
+# Cost model: every paid service below bills prorated to the second while it's running
+# (see https://render.com/docs/free / pricing FAQ). Keep these SUSPENDED in the Render
+# Dashboard between demos — suspended services incur no compute charges, only the tiny
+# persistent-disk storage fee (~$0.25/GB/month) keeps accruing. Resume them (a few
+# minutes) right before a live walkthrough, then suspend again afterward.
+#
+# All plans below are the cheapest paid tier (`starter`, $7/mo *while running*). Bump
+# any service to `standard` if it OOMs.
+
+services:
+  # Mirrors GCP Pub/Sub. No managed Kafka on Render, so this self-hosts the same images
+  # used locally. Ephemeral (no disk) — fine for demo purposes; a resume/redeploy starts
+  # with an empty topic, same as restarting docker-compose locally.
+  - type: pserv
+    name: zookeeper
+    runtime: image
+    image:
+      url: confluentinc/cp-zookeeper:7.3.0
+    plan: starter
+    envVars:
+      - key: ZOOKEEPER_CLIENT_PORT
+        value: 2181
+
+  - type: pserv
+    name: kafka
+    runtime: image
+    image:
+      url: confluentinc/cp-kafka:7.3.0
+    plan: starter
+    envVars:
+      - key: KAFKA_BROKER_ID
+        value: 1
+      - key: KAFKA_ZOOKEEPER_CONNECT
+        fromService:
+          name: zookeeper
+          type: pserv
+          property: hostport
+      - key: KAFKA_ADVERTISED_LISTENERS
+        fromService:
+          name: kafka
+          type: pserv
+          property: hostport
+        # NOTE: this resolves to "kafka:9092" but needs the "PLAINTEXT://" scheme
+        # prefixed. If Render doesn't let you prefix a fromService value, set this env
+        # var manually in the Dashboard after first sync: PLAINTEXT://kafka:9092
+      - key: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+        value: PLAINTEXT:PLAINTEXT
+      - key: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+        value: 1
+
+  # Mirrors GCP Cloud Composer. Web (not private) service so you can reach the UI.
+  # Disk persists the sqlite metadata db + admin user across resumes.
+  - type: web
+    name: airflow
+    runtime: docker
+    dockerfilePath: ./airflow/Dockerfile
+    dockerContext: ./airflow
+    plan: starter
+    dockerCommand: >
+      bash -c "airflow db init &&
+      airflow users create --username admin --password admin --firstname First --lastname Last --role Admin --email admin@example.com &&
+      exec airflow webserver"
+    envVars:
+      - key: AIRFLOW__CORE__EXECUTOR
+        value: SequentialExecutor
+      - key: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+        value: sqlite:////opt/airflow/airflow.db
+      - key: AIRFLOW__CORE__LOAD_EXAMPLES
+        value: "False"
+    disk:
+      name: airflow-data
+      mountPath: /opt/airflow
+      sizeGB: 1
+    # After first deploy, add the postgres_warehouse connection manually in the Airflow
+    # UI (Admin > Connections) pointing at the analytics-warehouse database below.
+
+  - type: worker
+    name: spark-streaming-ingest
+    runtime: docker
+    dockerfilePath: ./spark/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        fromService:
+          name: kafka
+          type: pserv
+          property: hostport
+      - key: DATABASE_URL
+        fromDatabase:
+          name: analytics-warehouse
+          property: connectionString
+
+  - type: worker
+    name: kafka-mock-producer
+    runtime: docker
+    dockerfilePath: ./kafka/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        fromService:
+          name: kafka
+          type: pserv
+          property: hostport
+
+  # Optional: free web UI for browsing the warehouse. Sleeps after 15 min idle (no
+  # cost while asleep), wakes in ~1 min on request.
+  - type: web
+    name: adminer
+    runtime: image
+    image:
+      url: adminer:4.8.1
+    plan: free
+
+databases:
+  - name: analytics-warehouse
+    databaseName: analytics_warehouse
+    user: pipeline_user
+    plan: basic-256mb # $6/mo while running; swap to `free` if this is your only free DB
+    diskSizeGB: 1
+    ipAllowList: [] # private-network only; add 0.0.0.0/0 if you want to query it directly

@@ -16,63 +16,72 @@ default_args = {
 with DAG(
     'warehouse_daily_aggregation_pipeline',
     default_args=default_args,
-    description='Daily analytical processing and maintenance for the ecommerce data warehouse',
+    description='Daily analytical processing and maintenance for the fraud detection data warehouse',
     schedule_interval='@daily',
     start_date=datetime(2026, 1, 1),
     catchup=False,
-    tags=['analytics', 'gcp_mirror'],
+    tags=['analytics', 'fraud_detection', 'gcp_mirror'],
 ) as dag:
 
-    # 1. Verification Task: Ensure the streaming process table exists before running analytics
+    # 1. Verification Task: Ensure the streaming process tables exist before running analytics
     # This mirrors checking for BigQuery landing partition readiness
     verify_warehouse_tables = SQLExecuteQueryOperator(
         task_id='verify_warehouse_tables',
         conn_id='postgres_warehouse',  # Configured in Airflow UI to point to port 5432
         sql="""
-            CREATE TABLE IF NOT EXISTS aggregated_device_metrics (
+            CREATE TABLE IF NOT EXISTS aggregated_fraud_metrics (
                 window_start TIMESTAMP,
                 window_end TIMESTAMP,
-                device VARCHAR(50),
-                event_type VARCHAR(50),
-                total_events INT
+                merchant_category VARCHAR(50),
+                total_transactions INT,
+                fraud_transactions INT
             );
-            CREATE TABLE IF NOT EXISTS raw_events (
+            CREATE TABLE IF NOT EXISTS fraud_events (
                 event_id VARCHAR(50),
                 event_timestamp TIMESTAMP,
                 user_id VARCHAR(50),
-                event_type VARCHAR(50),
-                product_id VARCHAR(50),
-                price DOUBLE PRECISION,
-                device VARCHAR(50)
+                amount DOUBLE PRECISION,
+                merchant_category VARCHAR(50),
+                device VARCHAR(50),
+                is_new_device BOOLEAN,
+                payment_method VARCHAR(50),
+                country VARCHAR(10),
+                ip_country VARCHAR(10),
+                account_age_days INT,
+                time_since_last_txn_seconds DOUBLE PRECISION,
+                txn_count_last_1h INT,
+                distance_from_home_km DOUBLE PRECISION,
+                is_fraud INT,
+                fraud_scenario VARCHAR(50)
             );
         """
     )
 
-    # 2. Analytical Task: Aggregate raw minute windows into an executive daily metrics table
+    # 2. Analytical Task: Aggregate raw minute windows into an executive daily fraud report
     # This mirrors a BigQuery scheduled query or dbt transformation
     generate_daily_executive_report = SQLExecuteQueryOperator(
         task_id='generate_daily_executive_report',
         conn_id='postgres_warehouse',
         sql="""
-            CREATE TABLE IF NOT EXISTS daily_executive_device_summary AS 
+            CREATE TABLE IF NOT EXISTS daily_executive_fraud_summary AS 
             SELECT 
                 window_start::DATE as reporting_date,
-                device,
-                event_type,
-                SUM(total_events) as total_daily_events
-            FROM aggregated_device_metrics
-            GROUP BY 1, 2, 3;
+                merchant_category,
+                SUM(total_transactions) as total_daily_transactions,
+                SUM(fraud_transactions) as total_daily_fraud
+            FROM aggregated_fraud_metrics
+            GROUP BY 1, 2;
             
             -- Insert new patterns cleanly if table exists
-            INSERT INTO daily_executive_device_summary (reporting_date, device, event_type, total_daily_events)
+            INSERT INTO daily_executive_fraud_summary (reporting_date, merchant_category, total_daily_transactions, total_daily_fraud)
             SELECT 
                 window_start::DATE as reporting_date,
-                device,
-                event_type,
-                SUM(total_events)
-            FROM aggregated_device_metrics
+                merchant_category,
+                SUM(total_transactions),
+                SUM(fraud_transactions)
+            FROM aggregated_fraud_metrics
             WHERE window_start >= CURRENT_DATE - INTERVAL '1 day'
-            GROUP BY 1, 2, 3
+            GROUP BY 1, 2
             ON CONFLICT DO NOTHING;
         """
     )
@@ -83,7 +92,7 @@ with DAG(
         task_id='prune_old_partitions',
         conn_id='postgres_warehouse',
         sql="""
-            DELETE FROM aggregated_device_metrics 
+            DELETE FROM aggregated_fraud_metrics 
             WHERE window_start < CURRENT_DATE - INTERVAL '30 days';
         """
     )
