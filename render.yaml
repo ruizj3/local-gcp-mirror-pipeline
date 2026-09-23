@@ -45,7 +45,7 @@ services:
           name: kafka
           type: pserv
           property: host
-      - key: KAFKA_PORT
+      - key: PORT
         value: "10000"
       - key: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
         value: "1"
