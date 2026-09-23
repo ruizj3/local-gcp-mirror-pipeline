@@ -8,6 +8,28 @@ This project functions as a local, zero-cost framework matching the core archite
 - **Orchestration:** Apache Airflow (Concept: **GCP Cloud Composer**)
 - **Data Warehouse:** PostgreSQL (Concept: **GCP BigQuery / Cloud SQL**)
 
+## Pipeline Flow
+```mermaid
+flowchart LR
+	producer[Transaction simulator<br/>kafka/mock_producer.py]
+	kafka[Apache Kafka<br/>transactions topic]
+	spark[PySpark Structured Streaming<br/>spark/jobs/streaming_ingest.py]
+	raw[(PostgreSQL<br/>fraud_events)]
+	metrics[(PostgreSQL<br/>aggregated_fraud_metrics)]
+	airflow[Apache Airflow<br/>daily warehouse DAG]
+	adminer[Adminer<br/>SQL inspection UI]
+	training[Training data export<br/>scripts/export_training_data.py]
+
+	producer -->|JSON transactions| kafka
+	kafka -->|streaming records| spark
+	spark -->|raw events| raw
+	spark -->|1-minute fraud rollups| metrics
+	airflow -->|verify, summarize, prune| metrics
+	raw --> adminer
+	metrics --> adminer
+	raw --> training
+```
+
 ## Getting Started
 1. Run `docker-compose up -d` to launch the environment.
 2. Access the Airflow UI at `http://localhost:8080` (Credentials: admin/admin).
