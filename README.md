@@ -30,6 +30,14 @@ flowchart LR
 	raw --> training
 ```
 
+## Pipeline in Action
+
+### Live Data Flow
+![Live transaction producer](artifacts/service-gifs/producer-live.gif)
+![Spark worker writing PostgreSQL rows](artifacts/service-gifs/worker-postgres-live.gif)
+![Airflow warehouse DAG](artifacts/service-gifs/airflow-dag.gif) 
+![Adminer fraud event query](artifacts/service-gifs/adminer-fraud-events.gif)
+
 ## Getting Started
 1. Run `docker-compose up -d` to launch the environment.
 2. Access the Airflow UI at `http://localhost:8080` (Credentials: admin/admin).
