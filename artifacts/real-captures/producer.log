@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/josephruiz/Documents/GitHub/local-gcp-mirror-pipeline/kafka/mock_producer.py", line 7, in <module>
+    from kafka import KafkaProducer
+ModuleNotFoundError: No module named 'kafka'
